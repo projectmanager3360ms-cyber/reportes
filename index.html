@@ -790,9 +790,12 @@
 
         <!-- MAIN CONTENT -->
         <div class="main-content">
-            <div class="header">
-                <h2 id="headerTitle">Gestión de Pacientes</h2>
-                <p id="headerDesc">Administra el registro y seguimiento de tus pacientes</p>
+            <div class="header" style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <h2 id="headerTitle">Gestión de Pacientes</h2>
+                    <p id="headerDesc">Administra el registro y seguimiento de tus pacientes</p>
+                </div>
+                <button class="btn btn-secondary btn-sm" onclick="recargarDatos()" style="height: fit-content;">🔄 Recargar</button>
             </div>
 
             <div class="content-area">
@@ -1010,13 +1013,18 @@
 
         // ============ INICIALIZACIÓN ============
         document.addEventListener('DOMContentLoaded', async () => {
-            await cargarDatos();
-            generarSelectoresAños();
-            generarSelectoresMeses();
-            setupEventListeners();
-            actualizarTablaPacientes();
-            await cargarPacientesEnSelects();
-            await actualizarCalendario();
+            try {
+                await cargarDatos();
+                generarSelectoresAños();
+                generarSelectoresMeses();
+                setupEventListeners();
+                actualizarTablaPacientes();
+                await cargarPacientesEnSelects();
+                await actualizarCalendario();
+            } catch (error) {
+                console.error('Error en inicialización:', error);
+                mostrarToast('Error al cargar la aplicación: ' + error.message, 'error');
+            }
         });
 
         function setupEventListeners() {
@@ -1053,19 +1061,42 @@
             try {
                 mostrarLoading(true);
                 
-                const [pacientesRes, citasRes, anosRes] = await Promise.all([
-                    supabaseClient.from('pacientes').select('*'),
-                    supabaseClient.from('citas').select('*'),
-                    supabaseClient.from('anos').select('*')
-                ]);
+                // Cargar pacientes
+                const pacientesRes = await supabaseClient
+                    .from('pacientes')
+                    .select('*')
+                    .order('created_at', { ascending: false });
 
                 if (pacientesRes.error) throw pacientesRes.error;
-                if (citasRes.error) throw citasRes.error;
-                if (anosRes.error) throw anosRes.error;
-
                 pacientes = pacientesRes.data || [];
+
+                // Cargar citas
+                const citasRes = await supabaseClient
+                    .from('citas')
+                    .select('*')
+                    .order('fecha', { ascending: false });
+
+                if (citasRes.error) throw citasRes.error;
                 citas = citasRes.data || [];
-                años = anosRes.data?.map(a => a.ano).sort((a, b) => a - b) || [];
+
+                // Cargar años
+                const anosRes = await supabaseClient
+                    .from('anos')
+                    .select('ano')
+                    .order('ano', { ascending: true });
+
+                console.log('Respuesta años:', anosRes);
+
+                if (anosRes.error) {
+                    console.warn('Error cargando años:', anosRes.error);
+                    años = [2024, 2025, 2026, 2027, 2028];
+                } else if (!anosRes.data || anosRes.data.length === 0) {
+                    console.warn('No hay años en la BD, usando valores por defecto');
+                    años = [2024, 2025, 2026, 2027, 2028];
+                } else {
+                    años = anosRes.data.map(a => a.ano).sort((a, b) => a - b);
+                    console.log('Años cargados de BD:', años);
+                }
 
                 // Cargar checklists para cada cita
                 for (let cita of citas) {
@@ -1079,12 +1110,22 @@
                         data.forEach(item => {
                             cita.checklist[item.item] = item.completado;
                         });
+                    } else {
+                        cita.checklist = {};
                     }
                 }
 
+                console.log('Datos cargados correctamente');
+                console.log('Pacientes:', pacientes.length);
+                console.log('Citas:', citas.length);
+                console.log('Años:', años);
+
                 mostrarLoading(false);
+                mostrarToast('✅ Datos cargados correctamente', 'success');
             } catch (error) {
+                console.error('Error crítico al cargar datos:', error);
                 mostrarToast('Error al cargar datos: ' + error.message, 'error');
+                años = [2024, 2025, 2026, 2027, 2028];
                 mostrarLoading(false);
             }
         }
@@ -1245,12 +1286,25 @@
         // ============ GESTIÓN DE AÑOS ============
         function generarSelectoresAños() {
             const select = document.getElementById('calendarYear');
-            select.innerHTML = años.map(año => `<option value="${año}">${año}</option>`).join('');
+            
+            console.log('Generando select de años. Array años:', años);
+            
+            if (!años || años.length === 0) {
+                console.warn('Array de años vacío, usando valores por defecto');
+                años = [2024, 2025, 2026, 2027, 2028];
+            }
+            
+            const anosOrdenados = [...años].sort((a, b) => a - b);
+            select.innerHTML = anosOrdenados.map(año => `<option value="${año}">${año}</option>`).join('');
             
             const hoy = new Date().getFullYear();
-            if (años.includes(hoy)) {
+            if (anosOrdenados.includes(hoy)) {
                 select.value = hoy;
+            } else {
+                select.value = anosOrdenados[0];
             }
+            
+            console.log('Select de años generado:', select.innerHTML);
         }
 
         function generarSelectoresMeses() {
@@ -1291,9 +1345,20 @@
 
         // ============ CALENDARIO ============
         async function actualizarCalendario() {
-            const year = parseInt(document.getElementById('calendarYear').value);
-            const month = parseInt(document.getElementById('calendarMonth').value);
+            const yearSelect = document.getElementById('calendarYear');
+            const monthSelect = document.getElementById('calendarMonth');
             const grid = document.getElementById('calendarGrid');
+            
+            if (!yearSelect.value || !monthSelect.value) {
+                console.warn('Selects de año/mes no están listos');
+                grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 2rem; color: var(--text-secondary);">Cargando calendario...</div>';
+                return;
+            }
+            
+            const year = parseInt(yearSelect.value);
+            const month = parseInt(monthSelect.value);
+            
+            console.log(`Actualizando calendario: ${month + 1}/${year}`);
             
             const primerDia = new Date(year, month, 1);
             const ultimoDia = new Date(year, month + 1, 0);
@@ -1353,6 +1418,7 @@
                 
                 grid.appendChild(dayEl);
             }
+        }
         }
 
         function abrirAgregarPacienteDia(fecha) {
@@ -1676,6 +1742,20 @@
         }
 
         // ============ UTILIDADES ============
+        async function recargarDatos() {
+            try {
+                mostrarToast('⏳ Recargando datos...', 'info');
+                await cargarDatos();
+                generarSelectoresAños();
+                actualizarTablaPacientes();
+                await cargarPacientesEnSelects();
+                await actualizarCalendario();
+                mostrarToast('✅ Datos recargados', 'success');
+            } catch (error) {
+                mostrarToast('Error: ' + error.message, 'error');
+            }
+        }
+
         function mostrarLoading(mostrar) {
             const overlay = document.getElementById('loadingOverlay');
             if (mostrar) {
