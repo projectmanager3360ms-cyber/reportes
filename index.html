@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestor de Pacientes Médicos</title>
+    <title>Gestor de Pacientes Médicos - Supabase</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         * {
             margin: 0;
@@ -71,6 +72,29 @@
             color: var(--text-secondary);
             text-transform: uppercase;
             letter-spacing: 1px;
+        }
+
+        .logo .status {
+            font-size: 0.7rem;
+            margin-top: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            color: var(--accent-success);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--accent-success);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
         }
 
         .nav-tabs {
@@ -152,7 +176,7 @@
             }
         }
 
-        /* Formularios y Inputs */
+        /* Formularios */
         .form-group {
             margin-bottom: 1.5rem;
             display: flex;
@@ -234,6 +258,11 @@
             font-size: 0.85rem;
         }
 
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
         /* Tablas */
         .table-wrapper {
             overflow-x: auto;
@@ -261,10 +290,6 @@
             padding: 1rem;
             border-bottom: 1px solid var(--border);
             color: var(--text-secondary);
-        }
-
-        tbody tr {
-            transition: background 0.3s ease;
         }
 
         tbody tr:hover {
@@ -372,6 +397,8 @@
             justify-content: space-between;
             align-items: center;
             margin-bottom: 1rem;
+            flex-wrap: wrap;
+            gap: 1rem;
         }
 
         .calendar-header select {
@@ -539,7 +566,7 @@
             height: 400px;
         }
 
-        /* Etiquetas de estado */
+        /* Badges */
         .badge {
             display: inline-block;
             padding: 0.4rem 0.8rem;
@@ -568,32 +595,7 @@
             color: var(--accent-cyan);
         }
 
-        /* Acciones */
-        .action-buttons {
-            display: flex;
-            gap: 0.5rem;
-            justify-content: flex-end;
-        }
-
-        .action-buttons button {
-            padding: 0.5rem;
-            border: none;
-            background: none;
-            color: var(--text-secondary);
-            cursor: pointer;
-            transition: all 0.3s ease;
-            font-size: 0.9rem;
-        }
-
-        .action-buttons button:hover {
-            color: var(--accent-cyan);
-        }
-
-        .action-buttons button.delete:hover {
-            color: var(--accent-danger);
-        }
-
-        /* Spinner */
+        /* Loading */
         .loading {
             display: inline-block;
             width: 20px;
@@ -606,6 +608,35 @@
 
         @keyframes spin {
             to { transform: rotate(360deg); }
+        }
+
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            display: none;
+        }
+
+        .loading-overlay.active {
+            display: flex;
+        }
+
+        .loading-spinner {
+            text-align: center;
+        }
+
+        .loading-spinner .loading {
+            width: 50px;
+            height: 50px;
+            border-width: 4px;
+            margin: 0 auto 1rem;
         }
 
         /* Responsive */
@@ -653,7 +684,6 @@
             }
         }
 
-        /* Scrollbar */
         ::-webkit-scrollbar {
             width: 8px;
             height: 8px;
@@ -671,15 +701,84 @@
         ::-webkit-scrollbar-thumb:hover {
             background: var(--accent-cyan);
         }
+
+        .action-buttons {
+            display: flex;
+            gap: 0.5rem;
+            justify-content: flex-end;
+        }
+
+        .action-buttons button {
+            padding: 0.5rem;
+            border: none;
+            background: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+        }
+
+        .action-buttons button:hover {
+            color: var(--accent-cyan);
+        }
+
+        .action-buttons button.delete:hover {
+            color: var(--accent-danger);
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem 1.5rem;
+            backdrop-filter: blur(10px);
+            z-index: 2001;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .toast.success {
+            border-color: var(--accent-success);
+            color: var(--accent-success);
+        }
+
+        .toast.error {
+            border-color: var(--accent-danger);
+            color: var(--accent-danger);
+        }
     </style>
 </head>
 <body>
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner">
+            <div class="loading"></div>
+            <p>Cargando datos...</p>
+        </div>
+    </div>
+
     <div class="container">
         <!-- SIDEBAR -->
         <div class="sidebar">
             <div class="logo">
                 <h1>💊 MedCare</h1>
                 <p>Gestor de Pacientes</p>
+                <div class="status">
+                    <div class="status-dot"></div>
+                    <span>Conectado</span>
+                </div>
             </div>
             <nav class="nav-tabs" id="navTabs">
                 <button class="nav-tab active" data-tab="pacientes">👥 Pacientes</button>
@@ -699,7 +798,7 @@
             <div class="content-area">
                 <!-- TAB: PACIENTES -->
                 <div id="pacientes" class="tab-content active">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
                         <h3 style="font-size: 1.3rem;">Base de Datos de Pacientes</h3>
                         <button class="btn btn-primary" onclick="openPacienteModal()">+ Nuevo Paciente</button>
                     </div>
@@ -726,7 +825,9 @@
                                     <th>Acciones</th>
                                 </tr>
                             </thead>
-                            <tbody id="tablaPacientes"></tbody>
+                            <tbody id="tablaPacientes">
+                                <tr><td colspan="7" style="text-align: center; color: var(--text-secondary);">Cargando pacientes...</td></tr>
+                            </tbody>
                         </table>
                     </div>
                 </div>
@@ -736,23 +837,10 @@
                     <div class="calendar-container">
                         <div class="calendar-header">
                             <h3>Programación de Citas</h3>
-                            <div style="display: flex; gap: 1rem; align-items: center;">
+                            <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
                                 <select id="calendarYear" onchange="actualizarCalendario()"></select>
                                 <button class="btn btn-secondary btn-sm" onclick="agregarAñoNuevo()">➕ Nuevo Año</button>
-                                <select id="calendarMonth" onchange="actualizarCalendario()">
-                                    <option value="0">Enero</option>
-                                    <option value="1">Febrero</option>
-                                    <option value="2">Marzo</option>
-                                    <option value="3">Abril</option>
-                                    <option value="4">Mayo</option>
-                                    <option value="5">Junio</option>
-                                    <option value="6">Julio</option>
-                                    <option value="7">Agosto</option>
-                                    <option value="8">Septiembre</option>
-                                    <option value="9">Octubre</option>
-                                    <option value="10">Noviembre</option>
-                                    <option value="11">Diciembre</option>
-                                </select>
+                                <select id="calendarMonth" onchange="actualizarCalendario()"></select>
                             </div>
                         </div>
                         <div class="calendar-grid" id="calendarGrid"></div>
@@ -761,7 +849,7 @@
 
                 <!-- TAB: FILTROS -->
                 <div id="filtros" class="tab-content">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
                         <h3 style="font-size: 1.3rem;">Búsqueda Avanzada</h3>
                     </div>
 
@@ -772,8 +860,8 @@
                         <div class="search-box" style="flex: 1; min-width: 250px;">
                             <input type="text" id="filtroNombre" placeholder="Buscar por nombre..." onkeyup="buscarPacienteFiltro()">
                         </div>
-                        <button class="btn btn-secondary" onclick="mostrarSoloInasistentes()">Mostrar Inasistentes</button>
-                        <button class="btn btn-secondary" onclick="limpiarFiltros()">Limpiar Filtros</button>
+                        <button class="btn btn-secondary" onclick="mostrarSoloInasistentes()">Inasistentes</button>
+                        <button class="btn btn-secondary" onclick="limpiarFiltros()">Limpiar</button>
                     </div>
 
                     <div class="table-wrapper" style="margin-top: 2rem;">
@@ -788,7 +876,9 @@
                                     <th>Acciones</th>
                                 </tr>
                             </thead>
-                            <tbody id="tablaFiltros"></tbody>
+                            <tbody id="tablaFiltros">
+                                <tr><td colspan="6" style="text-align: center; color: var(--text-secondary);">Cargando citas...</td></tr>
+                            </tbody>
                         </table>
                     </div>
                 </div>
@@ -797,7 +887,7 @@
                 <div id="reportes" class="tab-content">
                     <div style="margin-bottom: 2rem;">
                         <h3 style="font-size: 1.3rem; margin-bottom: 1rem;">Reportes Mensuales</h3>
-                        <div style="display: flex; gap: 1rem;">
+                        <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
                             <button class="btn btn-primary" onclick="generarReporte()">Generar Reporte</button>
                             <button class="btn btn-secondary" onclick="descargarReporte()">📥 Descargar PDF</button>
                         </div>
@@ -902,25 +992,31 @@
     </div>
 
     <script>
+        // ============ CONFIGURACIÓN SUPABASE ============
+        const SUPABASE_URL = 'https://njwiodqvxjzdkinsssmsp.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qd2lvZHF2eGp6ZGtpbnNzbXNwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM5ODUyNjgsImV4cCI6MjA5OTU2MTI2OH0.w3qSt9VR7mIGiZAZiQYjNmMUsFj4DZ161ANvC9LXXIk';
+
+        const { createClient } = supabase;
+        const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
         // ============ DATOS ============
         let pacientes = [];
         let citas = [];
+        let checklistItems = ['Consulta', 'Prueba 1', 'Prueba 2', 'Prueba 3', 'Prueba 4', 'Finalizó', 'No asistió'];
         let currentEditingPaciente = null;
         let currentDayForPatient = null;
         let currentCitaForChecklist = null;
-        const checklistItems = ['Consulta', 'Prueba 1', 'Prueba 2', 'Prueba 3', 'Prueba 4', 'Finalizó', 'No asistió'];
+        let años = [];
 
         // ============ INICIALIZACIÓN ============
-        document.addEventListener('DOMContentLoaded', () => {
-            cargarDatos();
+        document.addEventListener('DOMContentLoaded', async () => {
+            await cargarDatos();
             generarSelectoresAños();
             generarSelectoresMeses();
-            actualizarCalendario();
             setupEventListeners();
-            cargarPacientesEnSelects();
-            const hoy = new Date();
-            document.getElementById('calendarMonth').value = hoy.getMonth();
-            document.getElementById('calendarYear').value = hoy.getFullYear();
+            actualizarTablaPacientes();
+            await cargarPacientesEnSelects();
+            await actualizarCalendario();
         });
 
         function setupEventListeners() {
@@ -949,57 +1045,48 @@
             document.getElementById('headerTitle').textContent = headers[tabName][0];
             document.getElementById('headerDesc').textContent = headers[tabName][1];
 
-            if (tabName === 'calendario') actualizarCalendario();
             if (tabName === 'filtros') actualizarTablaFiltros();
         }
 
-        // ============ ALMACENAMIENTO ============
-        function guardarDatos() {
-            localStorage.setItem('pacientes', JSON.stringify(pacientes));
-            localStorage.setItem('citas', JSON.stringify(citas));
-        }
+        // ============ SUPABASE OPERATIONS ============
+        async function cargarDatos() {
+            try {
+                mostrarLoading(true);
+                
+                const [pacientesRes, citasRes, anosRes] = await Promise.all([
+                    supabaseClient.from('pacientes').select('*'),
+                    supabaseClient.from('citas').select('*'),
+                    supabaseClient.from('anos').select('*')
+                ]);
 
-        function cargarDatos() {
-            pacientes = JSON.parse(localStorage.getItem('pacientes') || '[]');
-            citas = JSON.parse(localStorage.getItem('citas') || '[]');
-        }
+                if (pacientesRes.error) throw pacientesRes.error;
+                if (citasRes.error) throw citasRes.error;
+                if (anosRes.error) throw anosRes.error;
 
-        function generarSelectoresAños() {
-            let años = JSON.parse(localStorage.getItem('años') || '[]');
-            const hoy = new Date().getFullYear();
-            
-            // Si no hay años guardados, crear años por defecto (pasado, presente, futuro)
-            if (años.length === 0) {
-                años = [hoy - 1, hoy, hoy + 1, hoy + 2];
+                pacientes = pacientesRes.data || [];
+                citas = citasRes.data || [];
+                años = anosRes.data?.map(a => a.ano).sort((a, b) => a - b) || [];
+
+                // Cargar checklists para cada cita
+                for (let cita of citas) {
+                    const { data, error } = await supabaseClient
+                        .from('checklist')
+                        .select('*')
+                        .eq('cita_id', cita.id);
+                    
+                    if (!error && data) {
+                        cita.checklist = {};
+                        data.forEach(item => {
+                            cita.checklist[item.item] = item.completado;
+                        });
+                    }
+                }
+
+                mostrarLoading(false);
+            } catch (error) {
+                mostrarToast('Error al cargar datos: ' + error.message, 'error');
+                mostrarLoading(false);
             }
-            
-            años.sort((a, b) => a - b);
-            localStorage.setItem('años', JSON.stringify(años));
-            
-            const select = document.getElementById('calendarYear');
-            select.innerHTML = años.map(año => `<option value="${año}">${año}</option>`).join('');
-        }
-
-        function generarSelectoresMeses() {
-            const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
-                          'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-            const select = document.getElementById('calendarMonth');
-            select.innerHTML = meses.map((mes, idx) => `<option value="${idx}">${mes}</option>`).join('');
-        }
-
-        function agregarAñoNuevo() {
-            let años = JSON.parse(localStorage.getItem('años') || '[]');
-            const maxAño = Math.max(...años);
-            const nuevoAño = maxAño + 1;
-            
-            años.push(nuevoAño);
-            años.sort((a, b) => a - b);
-            localStorage.setItem('años', JSON.stringify(años));
-            
-            generarSelectoresAños();
-            document.getElementById('calendarYear').value = nuevoAño;
-            actualizarCalendario();
-            alert(`✅ Año ${nuevoAño} agregado exitosamente`);
         }
 
         // ============ GESTIÓN DE PACIENTES ============
@@ -1014,31 +1101,48 @@
             document.getElementById('pacienteModal').classList.remove('active');
         }
 
-        function guardarPaciente(e) {
+        async function guardarPaciente(e) {
             e.preventDefault();
-            const paciente = {
-                id: currentEditingPaciente?.id || Date.now().toString(),
+            
+            const datoPaciente = {
                 documento: document.getElementById('documento').value,
                 nombre: document.getElementById('nombre').value,
                 apellido: document.getElementById('apellido').value,
-                fechaNacimiento: document.getElementById('fechaNacimiento').value,
-                telefono: document.getElementById('telefono').value,
-                email: document.getElementById('email').value,
-                direccion: document.getElementById('direccion').value,
-                createdAt: currentEditingPaciente?.createdAt || new Date().toISOString()
+                fecha_nacimiento: document.getElementById('fechaNacimiento').value || null,
+                telefono: document.getElementById('telefono').value || null,
+                email: document.getElementById('email').value || null,
+                direccion: document.getElementById('direccion').value || null
             };
 
-            if (currentEditingPaciente) {
-                const idx = pacientes.findIndex(p => p.id === currentEditingPaciente.id);
-                pacientes[idx] = paciente;
-            } else {
-                pacientes.push(paciente);
-            }
+            try {
+                mostrarLoading(true);
 
-            guardarDatos();
-            closePacienteModal();
-            actualizarTablaPacientes();
-            cargarPacientesEnSelects();
+                if (currentEditingPaciente) {
+                    const { error } = await supabaseClient
+                        .from('pacientes')
+                        .update(datoPaciente)
+                        .eq('id', currentEditingPaciente.id);
+                    
+                    if (error) throw error;
+                    mostrarToast('Paciente actualizado correctamente', 'success');
+                } else {
+                    const { error } = await supabaseClient
+                        .from('pacientes')
+                        .insert([datoPaciente]);
+                    
+                    if (error) throw error;
+                    mostrarToast('Paciente creado correctamente', 'success');
+                }
+
+                await cargarDatos();
+                closePacienteModal();
+                actualizarTablaPacientes();
+                await cargarPacientesEnSelects();
+                mostrarLoading(false);
+            } catch (error) {
+                mostrarToast('Error: ' + error.message, 'error');
+                mostrarLoading(false);
+            }
         }
 
         function editarPaciente(id) {
@@ -1047,28 +1151,41 @@
             document.getElementById('documento').value = currentEditingPaciente.documento;
             document.getElementById('nombre').value = currentEditingPaciente.nombre;
             document.getElementById('apellido').value = currentEditingPaciente.apellido;
-            document.getElementById('fechaNacimiento').value = currentEditingPaciente.fechaNacimiento;
-            document.getElementById('telefono').value = currentEditingPaciente.telefono;
-            document.getElementById('email').value = currentEditingPaciente.email;
-            document.getElementById('direccion').value = currentEditingPaciente.direccion;
+            document.getElementById('fechaNacimiento').value = currentEditingPaciente.fecha_nacimiento || '';
+            document.getElementById('telefono').value = currentEditingPaciente.telefono || '';
+            document.getElementById('email').value = currentEditingPaciente.email || '';
+            document.getElementById('direccion').value = currentEditingPaciente.direccion || '';
             document.getElementById('pacienteModal').classList.add('active');
         }
 
-        function eliminarPaciente(id) {
+        async function eliminarPaciente(id) {
             if (confirm('¿Estás seguro de que deseas eliminar este paciente?')) {
-                pacientes = pacientes.filter(p => p.id !== id);
-                citas = citas.filter(c => c.pacienteId !== id);
-                guardarDatos();
-                actualizarTablaPacientes();
-                cargarPacientesEnSelects();
-                actualizarCalendario();
+                try {
+                    mostrarLoading(true);
+                    
+                    const { error } = await supabaseClient
+                        .from('pacientes')
+                        .delete()
+                        .eq('id', id);
+                    
+                    if (error) throw error;
+                    
+                    mostrarToast('Paciente eliminado correctamente', 'success');
+                    await cargarDatos();
+                    actualizarTablaPacientes();
+                    await cargarPacientesEnSelects();
+                    mostrarLoading(false);
+                } catch (error) {
+                    mostrarToast('Error: ' + error.message, 'error');
+                    mostrarLoading(false);
+                }
             }
         }
 
         function actualizarTablaPacientes() {
             const tbody = document.getElementById('tablaPacientes');
             tbody.innerHTML = pacientes.map(p => {
-                const edad = p.fechaNacimiento ? new Date().getFullYear() - new Date(p.fechaNacimiento).getFullYear() : '-';
+                const edad = p.fecha_nacimiento ? new Date().getFullYear() - new Date(p.fecha_nacimiento).getFullYear() : '-';
                 return `
                     <tr>
                         <td>${p.documento}</td>
@@ -1099,7 +1216,7 @@
 
             const tbody = document.getElementById('tablaPacientes');
             tbody.innerHTML = filtrados.map(p => {
-                const edad = p.fechaNacimiento ? new Date().getFullYear() - new Date(p.fechaNacimiento).getFullYear() : '-';
+                const edad = p.fecha_nacimiento ? new Date().getFullYear() - new Date(p.fecha_nacimiento).getFullYear() : '-';
                 return `
                     <tr>
                         <td>${p.documento}</td>
@@ -1119,14 +1236,61 @@
             }).join('');
         }
 
-        function cargarPacientesEnSelects() {
+        async function cargarPacientesEnSelects() {
             const select = document.getElementById('selectPacienteCalendario');
             select.innerHTML = '<option value="">-- Selecciona un paciente --</option>' + 
                 pacientes.map(p => `<option value="${p.id}">${p.nombre} ${p.apellido} (${p.documento})</option>`).join('');
         }
 
+        // ============ GESTIÓN DE AÑOS ============
+        function generarSelectoresAños() {
+            const select = document.getElementById('calendarYear');
+            select.innerHTML = años.map(año => `<option value="${año}">${año}</option>`).join('');
+            
+            const hoy = new Date().getFullYear();
+            if (años.includes(hoy)) {
+                select.value = hoy;
+            }
+        }
+
+        function generarSelectoresMeses() {
+            const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
+                          'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+            const select = document.getElementById('calendarMonth');
+            select.innerHTML = meses.map((mes, idx) => `<option value="${idx}">${mes}</option>`).join('');
+            
+            const hoy = new Date();
+            select.value = hoy.getMonth();
+        }
+
+        async function agregarAñoNuevo() {
+            const maxAño = Math.max(...años);
+            const nuevoAño = maxAño + 1;
+            
+            try {
+                mostrarLoading(true);
+                
+                const { error } = await supabaseClient
+                    .from('anos')
+                    .insert([{ ano: nuevoAño }]);
+                
+                if (error) throw error;
+                
+                años.push(nuevoAño);
+                años.sort((a, b) => a - b);
+                generarSelectoresAños();
+                document.getElementById('calendarYear').value = nuevoAño;
+                await actualizarCalendario();
+                mostrarToast(`✅ Año ${nuevoAño} agregado exitosamente`, 'success');
+                mostrarLoading(false);
+            } catch (error) {
+                mostrarToast('Error: ' + error.message, 'error');
+                mostrarLoading(false);
+            }
+        }
+
         // ============ CALENDARIO ============
-        function actualizarCalendario() {
+        async function actualizarCalendario() {
             const year = parseInt(document.getElementById('calendarYear').value);
             const month = parseInt(document.getElementById('calendarMonth').value);
             const grid = document.getElementById('calendarGrid');
@@ -1176,7 +1340,7 @@
                     <div class="calendar-day-number">${día}</div>
                     <div class="calendar-day-patients">
                         ${citasDelDia.map((c, i) => {
-                            const pac = pacientes.find(p => p.id === c.pacienteId);
+                            const pac = pacientes.find(p => p.id === c.paciente_id);
                             return `<div class="patient-badge" title="${pac?.nombre}">${pac?.nombre.substring(0, 3)}</div>`;
                         }).join('')}
                     </div>
@@ -1186,18 +1350,6 @@
                 if (citasDelDia.length < 20) {
                     dayEl.onclick = () => abrirAgregarPacienteDia(dateKey);
                 }
-                
-                // Mostrar checklists de pacientes en este día
-                citasDelDia.forEach(cita => {
-                    const badge = document.createElement('div');
-                    badge.style.fontSize = '0.65rem';
-                    badge.style.cursor = 'pointer';
-                    badge.style.marginLeft = '0.25rem';
-                    badge.onclick = (e) => {
-                        e.stopPropagation();
-                        abrirChecklist(cita.id);
-                    };
-                });
                 
                 grid.appendChild(dayEl);
             }
@@ -1236,40 +1388,64 @@
             }
         }
 
-        function confirmarAgregarPaciente() {
+        async function confirmarAgregarPaciente() {
             const pacienteId = document.getElementById('selectPacienteCalendario').value;
             if (!pacienteId) {
                 alert('Por favor selecciona un paciente');
                 return;
             }
             
-            const citasDelDia = citas.filter(c => c.fecha === currentDayForPatient);
-            if (citasDelDia.length >= 20) {
-                alert('❌ Capacidad máxima alcanzada');
+            const citasDelDia = citas.filter(c => c.fecha === currentDayForPatient && c.paciente_id === pacienteId);
+            if (citasDelDia.length > 0) {
+                alert('Este paciente ya tiene cita este día');
                 return;
             }
             
-            const cita = {
-                id: Date.now().toString(),
-                pacienteId,
-                fecha: currentDayForPatient,
-                checklist: checklistItems.reduce((acc, item) => {
-                    acc[item] = false;
-                    return acc;
-                }, {}),
-                createdAt: new Date().toISOString()
-            };
-            
-            citas.push(cita);
-            guardarDatos();
-            closeAgregarPacienteModal();
-            actualizarCalendario();
+            const citasDelDiaTotal = citas.filter(c => c.fecha === currentDayForPatient);
+            if (citasDelDiaTotal.length >= 20) {
+                alert('❌ Capacidad máxima alcanzada');
+                return;
+            }
+
+            try {
+                mostrarLoading(true);
+                
+                const { data: citaData, error: citaError } = await supabaseClient
+                    .from('citas')
+                    .insert([{ paciente_id: pacienteId, fecha: currentDayForPatient }])
+                    .select();
+                
+                if (citaError) throw citaError;
+                
+                const citaId = citaData[0].id;
+                
+                const checklistInserts = checklistItems.map(item => ({
+                    cita_id: citaId,
+                    item: item,
+                    completado: false
+                }));
+                
+                const { error: checklistError } = await supabaseClient
+                    .from('checklist')
+                    .insert(checklistInserts);
+                
+                if (checklistError) throw checklistError;
+                
+                mostrarToast('Paciente agregado exitosamente', 'success');
+                await cargarDatos();
+                closeAgregarPacienteModal();
+                await actualizarCalendario();
+                mostrarLoading(false);
+            } catch (error) {
+                mostrarToast('Error: ' + error.message, 'error');
+                mostrarLoading(false);
+            }
         }
 
         // ============ CHECKLIST ============
-        function abrirChecklist(citaId) {
+        async function abrirChecklist(citaId) {
             currentCitaForChecklist = citas.find(c => c.id === citaId);
-            const paciente = pacientes.find(p => p.id === currentCitaForChecklist.pacienteId);
+            const paciente = pacientes.find(p => p.id === currentCitaForChecklist.paciente_id);
             
             document.getElementById('checklistPacienteName').textContent = `${paciente.nombre} ${paciente.apellido}`;
             
@@ -1288,31 +1464,46 @@
             document.getElementById('checklistModal').classList.remove('active');
         }
 
-        function guardarChecklist() {
-            checklistItems.forEach(item => {
-                currentCitaForChecklist.checklist[item] = document.getElementById(`check-${item}`).checked;
-            });
-            
-            const idx = citas.findIndex(c => c.id === currentCitaForChecklist.id);
-            citas[idx] = currentCitaForChecklist;
-            guardarDatos();
-            closeChecklistModal();
-            actualizarTablaFiltros();
+        async function guardarChecklist() {
+            try {
+                mostrarLoading(true);
+                
+                for (let item of checklistItems) {
+                    const completado = document.getElementById(`check-${item}`).checked;
+                    
+                    const { error } = await supabaseClient
+                        .from('checklist')
+                        .update({ completado })
+                        .eq('cita_id', currentCitaForChecklist.id)
+                        .eq('item', item);
+                    
+                    if (error) throw error;
+                }
+                
+                mostrarToast('Checklist guardado correctamente', 'success');
+                await cargarDatos();
+                closeChecklistModal();
+                await actualizarTablaFiltros();
+                mostrarLoading(false);
+            } catch (error) {
+                mostrarToast('Error: ' + error.message, 'error');
+                mostrarLoading(false);
+            }
         }
 
-        // ============ FILTROS Y BÚSQUEDA ============
-        function actualizarTablaFiltros() {
+        // ============ FILTROS ============
+        async function actualizarTablaFiltros() {
             const tbody = document.getElementById('tablaFiltros');
             
             let citasConPaciente = citas.map(cita => {
-                const paciente = pacientes.find(p => p.id === cita.pacienteId);
+                const paciente = pacientes.find(p => p.id === cita.paciente_id);
                 return { ...cita, paciente };
             }).filter(c => c.paciente);
             
             tbody.innerHTML = citasConPaciente.map(cita => {
                 const paciente = cita.paciente;
-                const completed = Object.values(cita.checklist).filter(v => v).length;
-                const total = Object.keys(cita.checklist).length;
+                const completed = Object.values(cita.checklist || {}).filter(v => v).length;
+                const total = Object.keys(cita.checklist || {}).length;
                 const progreso = total > 0 ? Math.round((completed / total) * 100) : 0;
                 
                 let estadoBadge = '';
@@ -1341,7 +1532,7 @@
                         </td>
                         <td>${estadoBadge}</td>
                         <td>
-                            <button class="btn btn-sm btn-primary" onclick="abrirChecklist('${cita.id}')">Editar Checklist</button>
+                            <button class="btn btn-sm btn-primary" onclick="abrirChecklist('${cita.id}')">Editar</button>
                         </td>
                     </tr>
                 `;
@@ -1392,7 +1583,6 @@
             const mesesAtendidos = {};
             const mesesInasistentes = {};
             
-            // Inicializar meses
             for (let i = 0; i < 12; i++) {
                 const mes = new Date(2025, i, 1).toLocaleDateString('es-CO', { month: 'long' });
                 mesesAtendidos[mes] = 0;
@@ -1418,7 +1608,6 @@
             const datosAtendidos = Object.values(mesesAtendidos);
             const datosInasistentes = Object.values(mesesInasistentes);
             
-            // Gráfico Atendidos
             const ctxAtendidos = document.getElementById('chartAtendidos').getContext('2d');
             if (window.chartAtendidosInstance) window.chartAtendidosInstance.destroy();
             
@@ -1450,7 +1639,6 @@
                 }
             });
             
-            // Gráfico Inasistentes
             const ctxInasistentes = document.getElementById('chartInasistentes').getContext('2d');
             if (window.chartInasistentesInstance) window.chartInasistentesInstance.destroy();
             
@@ -1484,11 +1672,29 @@
         }
 
         function descargarReporte() {
-            alert('📊 Función de descarga PDF disponible en versión premium. Por ahora puedes hacer screenshot de los gráficos.');
+            mostrarToast('📊 Función de descarga PDF disponible pronto', 'info');
         }
 
-        // Cargar datos al inicio
-        actualizarTablaPacientes();
+        // ============ UTILIDADES ============
+        function mostrarLoading(mostrar) {
+            const overlay = document.getElementById('loadingOverlay');
+            if (mostrar) {
+                overlay.classList.add('active');
+            } else {
+                overlay.classList.remove('active');
+            }
+        }
+
+        function mostrarToast(mensaje, tipo = 'info') {
+            const toast = document.createElement('div');
+            toast.className = `toast ${tipo}`;
+            toast.textContent = mensaje;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
+        }
     </script>
 </body>
 </html>
